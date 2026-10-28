@@ -19,9 +19,10 @@ class CatalogueTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    r=Path(d);p=r/'resources/Secondary/Physics/Year 12/Forces';p.mkdir(parents=True);f=p/'forces.pptx'
    with zipfile.ZipFile(f,'w') as z:z.writestr('ppt/slides/slide1.xml','<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:sp><p:ph type="title"/><a:t>Forces and motion</a:t></p:sp></p:sld>')
+   with zipfile.ZipFile(f,'a') as z:z.writestr('ppt/slides/slide2.xml','<slide/>')
    f.with_suffix('.json').write_text('{"author":"A teacher"}')
    f.with_suffix('.pdf').write_bytes(b'%PDF-test')
-   out=build(r,'powerpoint','owner/powerpoint-library')['resources'];self.assertEqual(len(out),1);self.assertEqual(out[0]['title'],'Forces and motion');self.assertEqual(out[0]['slideCount'],1);self.assertEqual(out[0]['author'],'A teacher');self.assertIn('previewUrl',out[0]);self.assertTrue(list((r/'site/assets').glob('*.pdf')))
+   out=build(r,'powerpoint','owner/powerpoint-library')['resources'];self.assertEqual(len(out),1);self.assertEqual(out[0]['title'],'Forces and motion');self.assertEqual(out[0]['slideCount'],2);self.assertEqual(out[0]['author'],'A teacher');self.assertIn('previewUrl',out[0]);self.assertTrue(list((r/'site/assets').glob('*.pdf')))
  def test_metadata_and_lock_files_ignored(self):
   with tempfile.TemporaryDirectory() as d:
    r=Path(d);p=r/'resources/Secondary/Science/Year 07';p.mkdir(parents=True)
@@ -31,6 +32,7 @@ class CatalogueTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    r=Path(d);p=r/'resources/Secondary/Physics/Year 09/Electricity';p.mkdir(parents=True);f=p/'Resistance.pptx'
    with zipfile.ZipFile(f,'w') as z:z.writestr('ppt/slides/slide1.xml','<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:sp><p:ph type="title"/><a:t>Do now</a:t></p:sp></p:sld>')
+   with zipfile.ZipFile(f,'a') as z:z.writestr('ppt/slides/slide2.xml','<slide/>')
    self.assertEqual(build(r,'powerpoint','owner/powerpoint-library')['resources'][0]['title'],'Resistance')
  def test_uploaded_science_disciplines(self):
   for folder,subject in [('Biology','Biology'),('1_Chemical Science','Chemistry'),('3_Physical Science','Physics'),('Earth and Space Sciences','Earth and Space Science')]:
@@ -43,5 +45,20 @@ class CatalogueTests(unittest.TestCase):
    with zipfile.ZipFile(p/'NoSlides.pptx','w') as z:z.writestr('docProps/core.xml','<root/>')
    self.assertEqual(build(r,'powerpoint','owner/powerpoint-library')['resources'],[])
    self.assertEqual(len(json.loads((r/'site/import-report.json').read_text())['skippedFiles']),2)
+ def test_one_slide_removed_two_slides_kept(self):
+  with tempfile.TemporaryDirectory() as d:
+   r=Path(d);p=r/'resources';p.mkdir()
+   for name,count in [('One',1),('Two',2)]:
+    with zipfile.ZipFile(p/(name+'.pptx'),'w') as z:
+     for i in range(1,count+1):z.writestr(f'ppt/slides/slide{i}.xml','<slide/>')
+   out=build(r,'powerpoint','owner/powerpoint-library')['resources']
+   self.assertEqual([b['title'] for b in out],['Two'])
+   self.assertEqual(json.loads((r/'site/import-report.json').read_text())['skippedFiles'][0]['reason'],'Single-slide presentation excluded')
+ def test_legacy_one_slide_removed(self):
+  from unittest.mock import patch
+  with tempfile.TemporaryDirectory() as d:
+   r=Path(d);p=r/'resources';p.mkdir();(p/'Legacy.ppt').write_bytes(b'legacy')
+   with patch('build_catalog.ppt_info',return_value={'slideCount':1}):
+    self.assertEqual(build(r,'powerpoint','owner/powerpoint-library')['resources'],[])
 if __name__=='__main__':unittest.main()
 
