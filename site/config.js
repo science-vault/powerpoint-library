@@ -1,0 +1,1 @@
+window.LIBRARY_CONFIG={"kind": "powerpoint", "name": "PowerPoint Library", "noun": "presentation", "plural": "presentations", "repo": "science-vault/powerpoint-library", "hero": "A clearer way to teach."};
