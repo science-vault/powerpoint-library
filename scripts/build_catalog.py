@@ -5,7 +5,7 @@ from urllib.parse import urlsplit,quote
 from xml.etree import ElementTree as ET
 from datetime import date
 
-SCIENCE={'physics','chemistry','biology','human biology','science','earth and environmental science'}
+SCIENCE={'physics','chemistry','biology','human biology','science','earth and environmental science','earth and space science'}
 HUMANITIES={'history','geography','economics','humanities','economics and business','legal studies'}
 def https(value):
  try:
@@ -34,6 +34,11 @@ def infer(path):
    n=int(m[1]);year=[n] if n in range(1,13) else []
    if i>0 and parts[i-1] not in ['Primary','Secondary','resources']:subject=parts[i-1]
    if i+1<len(parts)-1:topic=' / '.join(parts[i+1:-1])
+ # Uploaded school collections nest a science discipline below the year folder.
+ for folder in parts[:-1]:
+  label=re.sub(r'^[0-9._ -]+','',folder).replace('_',' ').strip().casefold()
+  discipline={'biology':'Biology','biological science':'Biology','biological sciences':'Biology','chemistry':'Chemistry','chemical science':'Chemistry','chemical sciences':'Chemistry','physics':'Physics','physical science':'Physics','physical sciences':'Physics','earth and space sciences':'Earth and Space Science','earth and space science':'Earth and Space Science'}
+  if subject=='Science' and label in discipline:subject=discipline[label]
  title=re.sub(r'[_]+',' ',path.stem).strip()
  return dict(title=title,subject=subject,years=year,topic=topic)
 
@@ -49,7 +54,7 @@ def pptx_info(path):
      ph=shape.find('.//p:ph',ns)
      if ph is not None and ph.get('type') in ['title','ctrTitle']:
       title=' '.join(t.text or '' for t in shape.findall('.//a:t',ns)).strip();break
-    if title:result['title']=title
+    if title and not re.fullmatch(r'(?:do\s*now|learning intentions?|success criteria|starter|warm[ -]?up|lesson agenda|title)',title.strip(),re.I):result['title']=title
    if 'docProps/core.xml' in z.namelist():
     r=ET.fromstring(z.read('docProps/core.xml'));a=r.find('{http://purl.org/dc/elements/1.1/}creator')
     if a is not None and a.text:result['author']=a.text.strip()
@@ -64,7 +69,7 @@ def pptx_info(path):
 def build(root,kind,repo):
  root=Path(root);resources=root/'resources';site=root/'site';site.mkdir(exist_ok=True);assets=site/'assets';assets.mkdir(exist_ok=True)
  ext={'.ppt','.pptx','.pdf'} if kind=='powerpoint' else {'.mp4','.webm','.ogv','.ogg'}
- files=sorted(p for p in resources.rglob('*') if p.is_file());rows=[];seen={};seen_urls={};sidecars=set()
+ files=sorted(p for p in resources.rglob('*') if p.is_file() and not any(part.startswith(('.', '~$')) for part in p.relative_to(resources).parts));rows=[];seen={};seen_urls={};sidecars=set()
  def finish(b,p,ident):
   b.setdefault('author','');b.setdefault('description','');b.setdefault('years',[]);b['years']=sorted(set(b['years']))
   b.setdefault('subjectGroup','Science' if b['subject'].lower() in SCIENCE else 'Humanities' if b['subject'].lower() in HUMANITIES else b['subject'])
@@ -100,3 +105,4 @@ def build(root,kind,repo):
  rows.sort(key=lambda b:b['title'].casefold());catalog={'version':1,'resources':rows};(site/'catalog.json').write_text(json.dumps(catalog,indent=2,ensure_ascii=False)+'\n');print(f'{len(rows)} {kind} resources indexed');return catalog
 if __name__=='__main__':
  root=Path(__file__).resolve().parents[1];config=json.loads((root/'site/config.js').read_text().split('=',1)[1].rstrip(';\n'));build(root,config['kind'],os.environ.get('GITHUB_REPOSITORY',config['repo']))
+
