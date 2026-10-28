@@ -22,4 +22,19 @@ class CatalogueTests(unittest.TestCase):
    f.with_suffix('.json').write_text('{"author":"A teacher"}')
    f.with_suffix('.pdf').write_bytes(b'%PDF-test')
    out=build(r,'powerpoint','owner/powerpoint-library')['resources'];self.assertEqual(len(out),1);self.assertEqual(out[0]['title'],'Forces and motion');self.assertEqual(out[0]['slideCount'],1);self.assertEqual(out[0]['author'],'A teacher');self.assertIn('previewUrl',out[0]);self.assertTrue(list((r/'site/assets').glob('*.pdf')))
+ def test_metadata_and_lock_files_ignored(self):
+  with tempfile.TemporaryDirectory() as d:
+   r=Path(d);p=r/'resources/Secondary/Science/Year 07';p.mkdir(parents=True)
+   for name in ['._Lesson.pptx','~$Lesson.pptx','._Notes.pdf']:(p/name).write_bytes(b'metadata')
+   self.assertEqual(build(r,'powerpoint','owner/powerpoint-library')['resources'],[])
+ def test_generic_opening_slide_uses_filename(self):
+  with tempfile.TemporaryDirectory() as d:
+   r=Path(d);p=r/'resources/Secondary/Physics/Year 09/Electricity';p.mkdir(parents=True);f=p/'Resistance.pptx'
+   with zipfile.ZipFile(f,'w') as z:z.writestr('ppt/slides/slide1.xml','<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:sp><p:ph type="title"/><a:t>Do now</a:t></p:sp></p:sld>')
+   self.assertEqual(build(r,'powerpoint','owner/powerpoint-library')['resources'][0]['title'],'Resistance')
+ def test_uploaded_science_disciplines(self):
+  for folder,subject in [('Biology','Biology'),('1_Chemical Science','Chemistry'),('3_Physical Science','Physics'),('Earth and Space Sciences','Earth and Space Science')]:
+   value=infer(Path('resources/Secondary/Science/Year 08/Collection')/folder/'Lesson.pptx')
+   self.assertEqual(value['subject'],subject);self.assertEqual(value['years'],[8])
 if __name__=='__main__':unittest.main()
+
