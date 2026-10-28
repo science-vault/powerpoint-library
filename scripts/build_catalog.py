@@ -5,7 +5,7 @@ from urllib.parse import urlsplit,quote
 from xml.etree import ElementTree as ET
 from datetime import date
 
-SCIENCE={'physics','chemistry','biology','human biology','science','earth and environmental science','earth and space science'}
+SCIENCE={'physics','chemistry','biology','human biology','science','earth and environmental science','earth and space science','human biology general','psychology','science in practice'}
 HUMANITIES={'history','geography','economics','humanities','economics and business','legal studies'}
 def https(value):
  try:
@@ -37,7 +37,7 @@ def infer(path):
  # Uploaded school collections nest a science discipline below the year folder.
  for folder in parts[:-1]:
   label=re.sub(r'^[0-9._ -]+','',folder).replace('_',' ').strip().casefold()
-  discipline={'biology':'Biology','biological science':'Biology','biological sciences':'Biology','chemistry':'Chemistry','chemical science':'Chemistry','chemical sciences':'Chemistry','physics':'Physics','physical science':'Physics','physical sciences':'Physics','earth and space sciences':'Earth and Space Science','earth and space science':'Earth and Space Science'}
+  discipline={'human biology':'Human Biology','human biology general':'Human Biology General','psychology':'Psychology','science in practice':'Science in Practice','biology':'Biology','biological science':'Biology','biological sciences':'Biology','chemistry':'Chemistry','chemical science':'Chemistry','chemical sciences':'Chemistry','physics':'Physics','physical science':'Physics','physical sciences':'Physics','earth and space sciences':'Earth and Space Science','earth and space science':'Earth and Space Science'}
   label=re.sub(r' (?:i{1,3}|[0-9]+)$','',label)
   label={'bio':'biology','phys':'physics','ess':'earth and space science','earth and space':'earth and space science'}.get(label,label)
   if subject=='Science' and label in discipline:subject=discipline[label]
