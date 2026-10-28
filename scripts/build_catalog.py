@@ -68,12 +68,25 @@ def pptx_info(path):
  except (zipfile.BadZipFile,ET.ParseError,KeyError):pass
  return result,thumb
 
+def ppt_info(path):
+ # MS DocumentSummaryInformation PIDDSI_SLIDECOUNT (0x00000007).
+ import olefile
+ try:
+  with olefile.OleFileIO(path) as doc:
+   if doc.exists('\x05DocumentSummaryInformation'):
+    count=doc.getproperties('\x05DocumentSummaryInformation').get(7)
+    if type(count) is int and count>=0:return {'slideCount':count}
+ except (OSError,ValueError,TypeError):pass
+ return {}
+
 def build(root,kind,repo):
  root=Path(root);resources=root/'resources';site=root/'site';site.mkdir(exist_ok=True);assets=site/'assets';assets.mkdir(exist_ok=True)
  ext={'.ppt','.pptx','.pdf'} if kind=='powerpoint' else {'.mp4','.webm','.ogv','.ogg'}
  skipped=[]
  files=sorted(p for p in resources.rglob('*') if p.is_file() and not any(part.startswith(('.', '~$')) for part in p.relative_to(resources).parts));rows=[];seen={};seen_urls={};sidecars=set()
  def finish(b,p,ident):
+  if kind=='powerpoint' and b.get('slideCount')==1:
+   skipped.append({'sourcePath':p.relative_to(root).as_posix(),'reason':'Single-slide presentation excluded'});return
   b.setdefault('author','');b.setdefault('description','');b.setdefault('years',[]);b['years']=sorted(set(b['years']))
   b.setdefault('subjectGroup','Science' if b['subject'].lower() in SCIENCE else 'Humanities' if b['subject'].lower() in HUMANITIES else b['subject'])
   b['sourcePath']=p.relative_to(root).as_posix()
@@ -93,6 +106,7 @@ def build(root,kind,repo):
    if not info.get('slideCount'):
     skipped.append({'sourcePath':rel.as_posix(),'reason':'No readable slides in the uploaded PPTX'});continue
    b.update(info)
+  elif p.suffix.lower()=='.ppt':b.update(ppt_info(p))
   data=p.read_bytes();sha=hashlib.sha256(data).hexdigest();b['fileSHA256']=sha;b['url']='https://raw.githubusercontent.com/'+repo+'/main/'+quote(rel.as_posix());b['format']=p.suffix[1:].upper()
   side=p.with_suffix('.json')
   if side.exists():

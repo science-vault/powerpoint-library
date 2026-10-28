@@ -23,6 +23,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install legacy PowerPoint reader
+        run: python3 -m pip install olefile==0.47
       - name: Test catalogue builder
         run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Index uploaded resources
@@ -34,3 +36,4 @@ jobs:
       - name: Publish
         id: deployment
         uses: actions/deploy-pages@v4
+
