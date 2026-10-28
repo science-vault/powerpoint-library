@@ -38,6 +38,8 @@ def infer(path):
  for folder in parts[:-1]:
   label=re.sub(r'^[0-9._ -]+','',folder).replace('_',' ').strip().casefold()
   discipline={'biology':'Biology','biological science':'Biology','biological sciences':'Biology','chemistry':'Chemistry','chemical science':'Chemistry','chemical sciences':'Chemistry','physics':'Physics','physical science':'Physics','physical sciences':'Physics','earth and space sciences':'Earth and Space Science','earth and space science':'Earth and Space Science'}
+  label=re.sub(r' (?:i{1,3}|[0-9]+)$','',label)
+  label={'bio':'biology','phys':'physics','ess':'earth and space science','earth and space':'earth and space science'}.get(label,label)
   if subject=='Science' and label in discipline:subject=discipline[label]
  title=re.sub(r'[_]+',' ',path.stem).strip()
  return dict(title=title,subject=subject,years=year,topic=topic)
@@ -69,6 +71,7 @@ def pptx_info(path):
 def build(root,kind,repo):
  root=Path(root);resources=root/'resources';site=root/'site';site.mkdir(exist_ok=True);assets=site/'assets';assets.mkdir(exist_ok=True)
  ext={'.ppt','.pptx','.pdf'} if kind=='powerpoint' else {'.mp4','.webm','.ogv','.ogg'}
+ skipped=[]
  files=sorted(p for p in resources.rglob('*') if p.is_file() and not any(part.startswith(('.', '~$')) for part in p.relative_to(resources).parts));rows=[];seen={};seen_urls={};sidecars=set()
  def finish(b,p,ident):
   b.setdefault('author','');b.setdefault('description','');b.setdefault('years',[]);b['years']=sorted(set(b['years']))
@@ -85,7 +88,11 @@ def build(root,kind,repo):
   if p.suffix.lower() not in ext:continue
   if p.suffix.lower()=='.pdf' and any(x.exists() for x in [p.with_suffix('.pptx'),p.with_suffix('.ppt')]):continue
   rel=p.relative_to(root);b=infer(rel);thumb=None
-  if p.suffix.lower()=='.pptx':info,thumb=pptx_info(p);b.update(info)
+  if p.suffix.lower()=='.pptx':
+   info,thumb=pptx_info(p)
+   if not info.get('slideCount'):
+    skipped.append({'sourcePath':rel.as_posix(),'reason':'No readable slides in the uploaded PPTX'});continue
+   b.update(info)
   data=p.read_bytes();sha=hashlib.sha256(data).hexdigest();b['fileSHA256']=sha;b['url']='https://raw.githubusercontent.com/'+repo+'/main/'+quote(rel.as_posix());b['format']=p.suffix[1:].upper()
   side=p.with_suffix('.json')
   if side.exists():
@@ -102,6 +109,7 @@ def build(root,kind,repo):
   b=json.loads(p.read_text())
   if not isinstance(b,dict):raise ValueError(str(p)+': resource must be a JSON object')
   base=infer(p);base.update(b);base.setdefault('format','Video link' if kind=='video' else 'Presentation link');validate(base);finish(base,p,'url:'+base['url'])
+ (site/'import-report.json').write_text(json.dumps({'skippedFiles':skipped},indent=2,ensure_ascii=False)+'\n')
  rows.sort(key=lambda b:b['title'].casefold());catalog={'version':1,'resources':rows};(site/'catalog.json').write_text(json.dumps(catalog,indent=2,ensure_ascii=False)+'\n');print(f'{len(rows)} {kind} resources indexed');return catalog
 if __name__=='__main__':
  root=Path(__file__).resolve().parents[1];config=json.loads((root/'site/config.js').read_text().split('=',1)[1].rstrip(';\n'));build(root,config['kind'],os.environ.get('GITHUB_REPOSITORY',config['repo']))

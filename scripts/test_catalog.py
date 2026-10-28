@@ -36,5 +36,12 @@ class CatalogueTests(unittest.TestCase):
   for folder,subject in [('Biology','Biology'),('1_Chemical Science','Chemistry'),('3_Physical Science','Physics'),('Earth and Space Sciences','Earth and Space Science')]:
    value=infer(Path('resources/Secondary/Science/Year 08/Collection')/folder/'Lesson.pptx')
    self.assertEqual(value['subject'],subject);self.assertEqual(value['years'],[8])
+ def test_empty_or_invalid_presentations_reported(self):
+  with tempfile.TemporaryDirectory() as d:
+   r=Path(d);p=r/'resources';p.mkdir()
+   (p/'Empty.pptx').write_bytes(b'')
+   with zipfile.ZipFile(p/'NoSlides.pptx','w') as z:z.writestr('docProps/core.xml','<root/>')
+   self.assertEqual(build(r,'powerpoint','owner/powerpoint-library')['resources'],[])
+   self.assertEqual(len(json.loads((r/'site/import-report.json').read_text())['skippedFiles']),2)
 if __name__=='__main__':unittest.main()
 
