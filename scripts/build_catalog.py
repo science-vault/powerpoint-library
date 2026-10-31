@@ -92,8 +92,13 @@ def build(root,kind,repo):
    try:added=subprocess.check_output(['git','log','--diff-filter=A','--format=%aI','--',b['sourcePath']],cwd=root,stderr=subprocess.DEVNULL,text=True).strip().splitlines();b['added']=added[-1][:10] if added else date.today().isoformat()
    except (subprocess.CalledProcessError,FileNotFoundError):b['added']=date.today().isoformat()
   b['id']=kind+'-'+hashlib.sha256(ident.encode()).hexdigest()[:16];validate(b)
-  # Preserve every uploaded file location, including copies used by different year groups.
-  rows.append(b)
+  if kind=='powerpoint':
+   # Keep separate copies visible for each uploaded folder.
+   rows.append(b)
+  else:
+   old=seen.get(ident) or seen_urls.get(b['url'])
+   if old:old.setdefault('alternateSourcePaths',[]).append(b['sourcePath'])
+   else:seen[ident]=b;seen_urls[b['url']]=b;rows.append(b)
  for p in files:
   if p.suffix.lower() not in ext:continue
   if p.suffix.lower()=='.pdf' and any(x.exists() for x in [p.with_suffix('.pptx'),p.with_suffix('.ppt')]):continue
