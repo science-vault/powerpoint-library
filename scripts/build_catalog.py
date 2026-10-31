@@ -85,8 +85,6 @@ def build(root,kind,repo):
  skipped=[]
  files=sorted(p for p in resources.rglob('*') if p.is_file() and not any(part.startswith(('.', '~$')) for part in p.relative_to(resources).parts));rows=[];seen={};seen_urls={};sidecars=set()
  def finish(b,p,ident):
-  if kind=='powerpoint' and b.get('slideCount')==1:
-   skipped.append({'sourcePath':p.relative_to(root).as_posix(),'reason':'Single-slide presentation excluded'});return
   b.setdefault('author','');b.setdefault('description','');b.setdefault('years',[]);b['years']=sorted(set(b['years']))
   b.setdefault('subjectGroup','Science' if b['subject'].lower() in SCIENCE else 'Humanities' if b['subject'].lower() in HUMANITIES else b['subject'])
   b['sourcePath']=p.relative_to(root).as_posix()
@@ -94,9 +92,8 @@ def build(root,kind,repo):
    try:added=subprocess.check_output(['git','log','--diff-filter=A','--format=%aI','--',b['sourcePath']],cwd=root,stderr=subprocess.DEVNULL,text=True).strip().splitlines();b['added']=added[-1][:10] if added else date.today().isoformat()
    except (subprocess.CalledProcessError,FileNotFoundError):b['added']=date.today().isoformat()
   b['id']=kind+'-'+hashlib.sha256(ident.encode()).hexdigest()[:16];validate(b)
-  old=seen.get(ident) or seen_urls.get(b['url'])
-  if old:old.setdefault('alternateSourcePaths',[]).append(b['sourcePath'])
-  else:seen[ident]=b;seen_urls[b['url']]=b;rows.append(b)
+  # Preserve every uploaded file location, including copies used by different year groups.
+  rows.append(b)
  for p in files:
   if p.suffix.lower() not in ext:continue
   if p.suffix.lower()=='.pdf' and any(x.exists() for x in [p.with_suffix('.pptx'),p.with_suffix('.ppt')]):continue
@@ -117,7 +114,7 @@ def build(root,kind,repo):
    target='assets/'+sha[:20]+'.pdf';shutil.copyfile(preview,site/target);b['previewUrl']='https://'+repo.split('/')[0]+'.github.io/'+repo.split('/')[1]+'/'+target
   if thumb and not b.get('thumbnail'):
    target='assets/'+sha[:20]+thumb[1];(site/target).write_bytes(thumb[0]);b['thumbnail']=target
-  finish(b,p,'file:'+sha)
+  finish(b,p,'file:'+rel.as_posix())
  for p in files:
   if p.suffix.lower()!='.json' or p in sidecars:continue
   b=json.loads(p.read_text())
