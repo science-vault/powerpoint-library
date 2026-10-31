@@ -59,6 +59,6 @@ class CatalogueTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    r=Path(d);p=r/'resources';p.mkdir();(p/'Legacy.ppt').write_bytes(b'legacy')
    with patch('build_catalog.ppt_info',return_value={'slideCount':1}):
-    self.assertEqual(build(r,'powerpoint','owner/powerpoint-library')['resources'],[])
+    self.assertEqual(len(build(r,'powerpoint','owner/powerpoint-library')['resources']),1)
 if __name__=='__main__':unittest.main()
 
