@@ -27,7 +27,7 @@ class CatalogueTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    r=Path(d);p=r/'resources/Secondary/Science/Year 07';p.mkdir(parents=True)
    for name in ['._Lesson.pptx','~$Lesson.pptx','._Notes.pdf']:(p/name).write_bytes(b'metadata')
-   self.assertEqual(len(build(r,'powerpoint','owner/powerpoint-library')['resources']),1)
+   self.assertEqual(build(r,'powerpoint','owner/powerpoint-library')['resources'],[])
  def test_generic_opening_slide_uses_filename(self):
   with tempfile.TemporaryDirectory() as d:
    r=Path(d);p=r/'resources/Secondary/Physics/Year 09/Electricity';p.mkdir(parents=True);f=p/'Resistance.pptx'
