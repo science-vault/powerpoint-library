@@ -27,7 +27,7 @@ class CatalogueTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    r=Path(d);p=r/'resources/Secondary/Science/Year 07';p.mkdir(parents=True)
    for name in ['._Lesson.pptx','~$Lesson.pptx','._Notes.pdf']:(p/name).write_bytes(b'metadata')
-   self.assertEqual(build(r,'powerpoint','owner/powerpoint-library')['resources'],[])
+   self.assertEqual(len(build(r,'powerpoint','owner/powerpoint-library')['resources']),1)
  def test_generic_opening_slide_uses_filename(self):
   with tempfile.TemporaryDirectory() as d:
    r=Path(d);p=r/'resources/Secondary/Physics/Year 09/Electricity';p.mkdir(parents=True);f=p/'Resistance.pptx'
@@ -45,16 +45,16 @@ class CatalogueTests(unittest.TestCase):
    with zipfile.ZipFile(p/'NoSlides.pptx','w') as z:z.writestr('docProps/core.xml','<root/>')
    self.assertEqual(build(r,'powerpoint','owner/powerpoint-library')['resources'],[])
    self.assertEqual(len(json.loads((r/'site/import-report.json').read_text())['skippedFiles']),2)
- def test_one_slide_removed_two_slides_kept(self):
+ def test_one_slide_and_two_slides_kept(self):
   with tempfile.TemporaryDirectory() as d:
    r=Path(d);p=r/'resources';p.mkdir()
    for name,count in [('One',1),('Two',2)]:
     with zipfile.ZipFile(p/(name+'.pptx'),'w') as z:
      for i in range(1,count+1):z.writestr(f'ppt/slides/slide{i}.xml','<slide/>')
    out=build(r,'powerpoint','owner/powerpoint-library')['resources']
-   self.assertEqual([b['title'] for b in out],['Two'])
-   self.assertEqual(json.loads((r/'site/import-report.json').read_text())['skippedFiles'][0]['reason'],'Single-slide presentation excluded')
- def test_legacy_one_slide_removed(self):
+   self.assertEqual([b['title'] for b in out],['One','Two'])
+   self.assertEqual(json.loads((r/'site/import-report.json').read_text())['skippedFiles'],[])
+ def test_legacy_one_slide_kept(self):
   from unittest.mock import patch
   with tempfile.TemporaryDirectory() as d:
    r=Path(d);p=r/'resources';p.mkdir();(p/'Legacy.ppt').write_bytes(b'legacy')
