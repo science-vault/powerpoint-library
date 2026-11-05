@@ -102,14 +102,19 @@ def build(root,kind,repo):
  for p in files:
   if p.suffix.lower() not in ext:continue
   if p.suffix.lower()=='.pdf' and any(x.exists() for x in [p.with_suffix('.pptx'),p.with_suffix('.ppt')]):continue
-  rel=p.relative_to(root);b=infer(rel);thumb=None
-  if p.suffix.lower()=='.pptx':
+  rel=p.relative_to(root);b=infer(rel);thumb=None;actual_ext=p.suffix.lower()
+  # Some uploaded PDFs retain a PowerPoint filename. Keep their source identity
+  # while exposing the readable PDF through the existing PDF preview route.
+  if actual_ext in ['.ppt','.pptx']:
+   with p.open('rb') as source:header=source.read(8)
+   if header.startswith(b'%PDF-'):actual_ext='.pdf'
+  if actual_ext=='.pptx':
    info,thumb=pptx_info(p)
    if not info.get('slideCount'):
     skipped.append({'sourcePath':rel.as_posix(),'reason':'No readable slides in the uploaded PPTX'});continue
    b.update(info)
-  elif p.suffix.lower()=='.ppt':b.update(ppt_info(p))
-  data=p.read_bytes();sha=hashlib.sha256(data).hexdigest();b['fileSHA256']=sha;b['url']='https://raw.githubusercontent.com/'+repo+'/main/'+quote(rel.as_posix());b['format']=p.suffix[1:].upper()
+  elif actual_ext=='.ppt':b.update(ppt_info(p))
+  data=p.read_bytes();sha=hashlib.sha256(data).hexdigest();b['fileSHA256']=sha;b['url']='https://raw.githubusercontent.com/'+repo+'/main/'+quote(rel.as_posix());b['format']=actual_ext[1:].upper()
   side=p.with_suffix('.json')
   if side.exists():
    override=json.loads(side.read_text());
@@ -117,6 +122,8 @@ def build(root,kind,repo):
   preview=p.with_suffix('.pdf')
   if kind=='powerpoint' and p.suffix.lower() in ['.ppt','.pptx'] and preview.exists():
    target='assets/'+sha[:20]+'.pdf';shutil.copyfile(preview,site/target);b['previewUrl']='https://'+repo.split('/')[0]+'.github.io/'+repo.split('/')[1]+'/'+target
+  if actual_ext=='.pdf' and p.suffix.lower()!='.pdf':
+   target='assets/'+sha[:20]+'.pdf';shutil.copyfile(p,site/target);b['previewUrl']='https://'+repo.split('/')[0]+'.github.io/'+repo.split('/')[1]+'/'+target
   if thumb and not b.get('thumbnail'):
    target='assets/'+sha[:20]+thumb[1];(site/target).write_bytes(thumb[0]);b['thumbnail']=target
   finish(b,p,'file:'+rel.as_posix())
@@ -129,4 +136,5 @@ def build(root,kind,repo):
  rows.sort(key=lambda b:b['title'].casefold());catalog={'version':1,'resources':rows};(site/'catalog.json').write_text(json.dumps(catalog,indent=2,ensure_ascii=False)+'\n');print(f'{len(rows)} {kind} resources indexed');return catalog
 if __name__=='__main__':
  root=Path(__file__).resolve().parents[1];config=json.loads((root/'site/config.js').read_text().split('=',1)[1].rstrip(';\n'));build(root,config['kind'],os.environ.get('GITHUB_REPOSITORY',config['repo']))
+
 

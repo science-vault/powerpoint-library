@@ -60,5 +60,15 @@ class CatalogueTests(unittest.TestCase):
    r=Path(d);p=r/'resources';p.mkdir();(p/'Legacy.ppt').write_bytes(b'legacy')
    with patch('build_catalog.ppt_info',return_value={'slideCount':1}):
     self.assertEqual(len(build(r,'powerpoint','owner/powerpoint-library')['resources']),1)
+ def test_pdf_uploaded_with_powerpoint_extension(self):
+  for extension in ['.pptx','.ppt']:
+   with self.subTest(extension=extension),tempfile.TemporaryDirectory() as d:
+    r=Path(d);folder=r/'resources/Secondary/Mathematics/Year 07';folder.mkdir(parents=True)
+    source=folder/('Directed numbers worksheet'+extension);payload=b'%PDF-1.4\nvalid-pdf-signature';source.write_bytes(payload)
+    rows=build(r,'powerpoint','owner/powerpoint-library')['resources'];self.assertEqual(len(rows),1)
+    item=rows[0];self.assertEqual(item['format'],'PDF');self.assertEqual(item['sourcePath'],source.relative_to(r).as_posix())
+    self.assertTrue(item['url'].endswith(extension));self.assertTrue(item['previewUrl'].endswith('.pdf'));self.assertEqual(next((r/'site/assets').glob('*.pdf')).read_bytes(),payload)
+    self.assertEqual(source.read_bytes(),payload);self.assertEqual(json.loads((r/'site/import-report.json').read_text())['skippedFiles'],[])
 if __name__=='__main__':unittest.main()
+
 
