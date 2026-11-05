@@ -19,6 +19,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Keep upload dates from history, but fetch file contents only for the current checkout.
+          filter: blob:none
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
