@@ -7,6 +7,8 @@ import fitz
 ROOT=Path(__file__).resolve().parents[1]
 CACHE=ROOT/'.thumbnail-cache'
 _LOCK=threading.Lock()
+OVERRIDES_PATH=ROOT/'scripts/thumbnail-overrides.json'
+OVERRIDES=json.loads(OVERRIDES_PATH.read_text()) if OVERRIDES_PATH.exists() else {}
 
 def pdf_thumbnail(source,target):
  with fitz.open(source) as doc:
@@ -20,6 +22,10 @@ def generate(row):
  if not source.is_relative_to((ROOT/'resources').resolve()) or not source.is_file():return None
  digest=row.get('fileSHA256') or hashlib.sha256(source.read_bytes()).hexdigest()
  target=CACHE/(digest+'.jpg')
+ override=OVERRIDES.get(digest)
+ if override:
+  supplied=(ROOT/override['image']).resolve()
+  if supplied.is_relative_to((ROOT/'site/assets').resolve()) and supplied.is_file():return supplied
  if target.exists():return target
  with tempfile.TemporaryDirectory(prefix='vault-thumb-') as folder:
   work=Path(folder);out=work/'frame.jpg'
@@ -89,8 +95,11 @@ def build():
   path=generated.get(row.get('fileSHA256') or row['sourcePath'])
   if path:
    name='thumb-'+path.name;shutil.copyfile(path,assets/name);row['thumbnail']='assets/'+name
+   override=OVERRIDES.get(row.get('fileSHA256'),{})
+   if override.get('status')=='unavailable':row['thumbnailStatus']='unavailable'
+   elif override:row['thumbnailMethod']=override.get('method','Supplied source preview')
  catalog_path.write_text(json.dumps(catalog,ensure_ascii=False,separators=(',',':'))+'\n')
- report={'resources':len(rows),'withThumbnails':sum(bool(r.get('thumbnail')) for r in rows),'failedSources':failures}
+ report={'resources':len(rows),'withThumbnails':sum(bool(r.get('thumbnail')) for r in rows),'failedSources':failures,'withContentThumbnails':sum(bool(r.get('thumbnail')) and r.get('thumbnailStatus')!='unavailable' for r in rows),'unavailablePreviews':[r['sourcePath'] for r in rows if r.get('thumbnailStatus')=='unavailable']}
  (ROOT/'site/thumbnail-report.json').write_text(json.dumps(report,indent=2)+'\n')
  print(json.dumps({k:v for k,v in report.items() if k!='failedSources'}),flush=True)
  print(f'{len(failures)} sources could not be rendered',flush=True)

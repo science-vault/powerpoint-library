@@ -1,0 +1,11 @@
+{
+  "a58d6589780f9aa6aca1a3219ce06122297142b2f9d3734e570bdbdeff2ed727": {
+    "image": "site/assets/fermi-first-slide.jpg",
+    "method": "Rendered directly from first-slide shapes and text using its original font families"
+  },
+  "6ca137de4e19315b5515fff914a2c8ff6ee20617a2ec871decec7410ccf62e82": {
+    "image": "site/assets/ecosystems-preview-unavailable.jpg",
+    "status": "unavailable",
+    "reason": "Original OLE directory and allocation tables contain zeros; no readable slide directory"
+  }
+}
