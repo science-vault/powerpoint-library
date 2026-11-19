@@ -57,6 +57,8 @@ def pptx_info(path):
      if ph is not None and ph.get('type') in ['title','ctrTitle']:
       title=' '.join(t.text or '' for t in shape.findall('.//a:t',ns)).strip();break
     if title and not re.fullmatch(r'(?:do\s*now|learning intentions?|success criteria|starter|warm[ -]?up|lesson agenda|title)',title.strip(),re.I):result['title']=title
+   slide_files=sorted((n for n in z.namelist() if re.fullmatch(r'ppt/slides/slide\d+\.xml',n)),key=lambda n:int(re.search(r'(\d+)\.xml',n)[1]))[:8]
+   result['searchText']=' '.join(' '.join(el.text or '' for el in ET.fromstring(z.read(n)).iter('{http://schemas.openxmlformats.org/drawingml/2006/main}t')) for n in slide_files)[:12000]
    if 'docProps/core.xml' in z.namelist():
     r=ET.fromstring(z.read('docProps/core.xml'));a=r.find('{http://purl.org/dc/elements/1.1/}creator')
     if a is not None and a.text:result['author']=a.text.strip()

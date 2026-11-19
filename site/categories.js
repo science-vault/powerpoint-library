@@ -98,7 +98,7 @@
   const generic=/^(?:\d+[. -]*)?(?:do now|learning intentions?|learning objectives?|success criteria|starter|warm up|lesson agenda|all about me|unit \d+|term \d+|page setup)$/i;
   const texts=generic.test(title)||title.length>180?[file,title]:[title,file];
   const folders=String(item.topic||'').split('/').map(words).filter(Boolean).reverse();
-  return {texts,folders};
+  return {texts:[...texts,words(item.searchText||item.description||"")],folders};
  }
  function match(rules,texts){for(const text of texts)for(const r of rules)if(r.re.test(text))return r;return null;}
  function classify(item){
@@ -125,4 +125,25 @@
  function result(topic,strand,item,type){return {topic,strand,subject:type==='science'&&lowerSchool(item)?'Science':item.subject};}
  function topic(item){return classify(item).topic;}
  root.PowerPointCategories={topic,classify,family};
+})(typeof window==='undefined'?globalThis:window);
+
+(function(root){
+const areaMap={science:'Science',mathematics:'Mathematics',hass:'Humanities and Social Sciences',hpe:'Health and Physical Education',psychology:'Science'};
+function enrich(b){
+ const parts=String(b.sourcePath||'').split('/');let years=b.years||[],subject=b.subject;
+ for(let i=0;i<parts.length-1;i++){const m=parts[i].match(/^(?:Year[ _-]*)?(0?[1-9]|1[0-2])$/i);if(m){if(!years.length)years=[Number(m[1])];if(!subject||subject==='Uncategorised')subject=parts[i-1];}}
+ subject=({HASS:'HASS',Maths:'Mathematics'})[subject]||subject||'Other';
+ const input={...b,subject,years,topic:b.topic||parts.slice(2,-1).join(" / ")};const cat=root.PowerPointCategories.classify(input),family=root.PowerPointCategories.family(input);
+ const area=areaMap[family]||subject;let strand=cat.strand,topic=cat.topic;subject=cat.subject;
+ if(area==='Humanities and Social Sciences'&&['History','Geography','Civics and Citizenship','Economics and Business'].includes(strand)){subject=strand;strand=subject==='History'?'Historical Knowledge and Understanding':subject==='Geography'?'Geographical Knowledge and Understanding':subject;}
+ if(area==='Mathematics')strand=/statistics/i.test(topic)?'Statistics':/probability/i.test(topic)?'Probability':/geometry|transform|similar|congruen/i.test(topic)?'Space':/measurement|trigonom|pythagoras/i.test(topic)?'Measurement':/algebra|function|equation|indices|calculus/i.test(topic)?'Algebra':'Number';
+ const senior=years.some(y=>y>=11);let pathway=b.pathway||(/\bgeneral\b/i.test(b.subject)?'General':/\bATAR\b/i.test(b.subject+' '+b.title+' '+b.sourcePath)?'ATAR':'');
+ const text=b.title+' '+(b.topic||'');
+ if(area==='Science'&&!senior)subject='Science';
+ const unitMatch=senior?text.match(/\bunits?\s*([1-4])(?:\s*(?:and|&|[-–])\s*([1-4]))?/i):null;
+ const unit=b.unit||(unitMatch?'Unit '+unitMatch[1]+(unitMatch[2]?'–'+unitMatch[2]:''):'');
+ const review=topic==='General & other resources';if(review)topic='Other '+subject+' resources';
+ return {...b,title:b.title.replace(/\s+Atomi$/i,''),years,subject,sourceSubject:b.subject,area,strand,categoryTopic:topic,pathway,unit,classificationStatus:review?'Needs curriculum review':'Topic classified',resourceType:b.format||'Link'};
+}
+root.LibraryCurriculum={enrich};
 })(typeof window==='undefined'?globalThis:window);
