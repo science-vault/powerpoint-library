@@ -1,5 +1,6 @@
 """Generate card images from uploaded media; cache by source content hash."""
-import concurrent.futures,hashlib,json,os,shutil,subprocess,tempfile,threading
+import concurrent.futures,hashlib,json,os,shutil,subprocess,tempfile,threading,zipfile
+from xml.etree import ElementTree as ET
 from pathlib import Path
 import fitz
 
@@ -31,13 +32,30 @@ def generate(row):
     subprocess.run(['ffmpeg','-nostdin','-v','error','-ss',seconds,'-i',str(source),'-frames:v','1','-vf','scale=640:360:force_original_aspect_ratio=decrease','-q:v','3','-y',str(out)],check=False,capture_output=True,timeout=90)
     if out.exists() and out.stat().st_size:break
   elif suffix in ['.ppt','.pptx']:
-   # A separate profile isolates concurrent conversions and disables macros.
-   profile=work/'profile';user=profile/'user';user.mkdir(parents=True)
-   (user/'registrymodifications.xcu').write_text('<oor:items xmlns:oor="http://openoffice.org/2001/registry"><item oor:path="/org.openoffice.Office.Common/Security/Scripting"><prop oor:name="MacroSecurityLevel" oor:op="fuse"><value>3</value></prop></item></oor:items>')
-   subprocess.run(['libreoffice','-env:UserInstallation='+profile.as_uri(),'--headless','--nologo','--nodefault','--norestore','--convert-to','pdf:impress_pdf_Export:{"PageRange":{"type":"string","value":"1"}}','--outdir',str(work),str(source)],check=True,capture_output=True,timeout=90)
-   converted=list(work.glob('*.pdf'))
-   if not converted:raise ValueError('No slide preview produced')
-   pdf_thumbnail(converted[0],out)
+   render_source=source
+   if suffix=='.pptx':
+    # Render a derivative containing the first slide only. Broken objects on later
+    # slides must not prevent a card image; the original download is untouched.
+    render_source=work/'first-slide.pptx'
+    with zipfile.ZipFile(source) as original,zipfile.ZipFile(render_source,'w',zipfile.ZIP_DEFLATED) as output:
+     presentation=ET.fromstring(original.read('ppt/presentation.xml'))
+     slide_list=presentation.find('{http://schemas.openxmlformats.org/presentationml/2006/main}sldIdLst')
+     if slide_list is not None:
+      for slide in list(slide_list)[1:]:slide_list.remove(slide)
+     for part in original.infolist():
+      output.writestr(part,ET.tostring(presentation,encoding='utf-8',xml_declaration=True) if part.filename=='ppt/presentation.xml' else original.read(part.filename))
+   errors=[]
+   for index,(extension,filter_name) in enumerate([('pdf','pdf:impress_pdf_Export:{"PageRange":{"type":"string","value":"1"}}'),('png','png:impress_png_Export')]):
+    profile=work/('profile-'+str(index));user=profile/'user';user.mkdir(parents=True)
+    (user/'registrymodifications.xcu').write_text('<oor:items xmlns:oor="http://openoffice.org/2001/registry"><item oor:path="/org.openoffice.Office.Common/Security/Scripting"><prop oor:name="MacroSecurityLevel" oor:op="fuse"><value>3</value></prop></item></oor:items>')
+    try:
+     result=subprocess.run(['libreoffice','-env:UserInstallation='+profile.as_uri(),'--headless','--nologo','--nodefault','--norestore','--convert-to',filter_name,'--outdir',str(work),str(render_source)],capture_output=True,timeout=90)
+     converted=list(work.glob('*.'+extension))
+     if result.returncode or not converted:
+      errors.append(f'{extension} exit {result.returncode}: '+result.stderr.decode(errors='replace')[-500:]);continue
+     pdf_thumbnail(converted[0],out);break
+    except Exception as exc:errors.append(str(exc)[:300])
+   if not out.exists():raise ValueError(' / '.join(errors))
   else:raise ValueError('Unsupported source format')
   if not out.exists() or not out.stat().st_size:raise ValueError('No image produced')
   # Concurrent duplicates use independent temp files and an atomic replacement.
