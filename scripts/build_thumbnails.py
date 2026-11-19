@@ -60,6 +60,13 @@ def build():
    if path:generated[key]=path
    else:failures.append({'sourcePath':unique[key]['sourcePath'],'reason':error or 'Source not available locally'})
    if count%50==0:print(f'Thumbnails: {count}/{len(unique)} processed',flush=True)
+ # Retry conversion crashes serially, avoiding competing office renderers.
+ retry_sources={f['sourcePath'] for f in failures};failures=[]
+ for key,row in unique.items():
+  if row['sourcePath'] not in retry_sources:continue
+  _,path,error=run((key,row))
+  if path:generated[key]=path
+  else:failures.append({'sourcePath':row['sourcePath'],'reason':error or 'Source not available locally'})
  for row in missing:
   path=generated.get(row.get('fileSHA256') or row['sourcePath'])
   if path:
