@@ -42,3 +42,5 @@ jobs:
         uses: actions/deploy-pages@v4
 
 
+
+# Resource catalogue refresh requested: 2026-11-19
